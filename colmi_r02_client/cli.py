@@ -105,7 +105,7 @@ async def set_time(client: Client, when: datetime | None) -> None:
     """
 
     if when is None:
-        when = datetime.now(tz=timezone.utc)
+        when = date_utils.now()
     async with client:
         await client.set_time(when)
     click.echo("Time set successfully")
@@ -133,7 +133,7 @@ async def get_heart_rate_log_settings(client: Client) -> None:
 )
 @click.pass_obj
 async def set_heart_rate_log_settings(client: Client, enable: bool, interval: int) -> None:
-    """Get heart rate log settings"""
+    """Set heart rate log settings"""
 
     async with client:
         click.echo("Changing heart rate log settings")
@@ -258,16 +258,22 @@ async def sync(client: Client, db_path: Path | None, start: datetime | None, end
     with db.get_db_session(db_path) as session:
         if start is None:
             start = db.get_last_sync(session, client.address)
+        else:
+            start = date_utils.naive_to_aware(start)
+
         if start is None:
             start = date_utils.now() - timedelta(days=7)
+
         if end is None:
             end = date_utils.now()
+        else:
+            end = date_utils.naive_to_aware(end)
 
         click.echo(f"Syncing from {start} to {end}")
 
         async with client:
             fd = await client.get_full_data(start, end)
-            db.sync(session, fd)
+            db.full_sync(session, fd)
             when = datetime.now(tz=timezone.utc)
             click.echo("Ignore unexpect packet")
             await client.set_time(when)
